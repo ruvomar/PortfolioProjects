@@ -1,0 +1,159 @@
+-- Checking to make sure dataset loaded
+SELECT *
+FROM `sunny-lightning-427102-p2.PortfolioProject.CovidDeaths`
+WHERE continent is not null
+ORDER BY 3, 4
+
+
+--Selecting data to be used
+SELECT
+  location,
+  date,
+  total_cases,
+  new_cases,
+  total_deaths,
+  population
+FROM `sunny-lightning-427102-p2.PortfolioProject.CovidDeaths`
+WHERE continent is not null
+ORDER BY 1, 2
+
+
+--Looking at total cases vs total deaths
+SELECT
+  location,
+  date,
+  total_cases,
+  total_deaths,
+  population
+FROM `sunny-lightning-427102-p2.PortfolioProject.CovidDeaths`
+WHERE continent is not null
+ORDER BY 1, 2
+
+
+--Looking at death percentage from total cases
+--Shows likelihood of dying from Covid in country
+SELECT
+  location,
+  date,
+  total_cases,
+  total_deaths,
+  (total_deaths/total_cases) * 100 AS DeathPercentage
+FROM `sunny-lightning-427102-p2.PortfolioProject.CovidDeaths`
+WHERE continent is not null
+ORDER BY 1, 2
+
+
+--Looking at total cases vs population
+--Shows what percentage of population got Covid
+SELECT
+  location,
+  date,
+  population,
+  total_cases,
+  (total_cases/population) * 100 AS PopulationInfectionPercentage
+FROM `sunny-lightning-427102-p2.PortfolioProject.CovidDeaths`
+WHERE continent is not null
+ORDER BY 1, 2
+
+
+--Looking at countries with highest infection rate compared to population
+SELECT
+  location,
+  population,
+  MAX(total_cases) AS HighestInfectionCount,
+  MAX((total_cases/population)) * 100 AS InfectionRatePercentage
+FROM `sunny-lightning-427102-p2.PortfolioProject.CovidDeaths`
+WHERE continent is not null
+GROUP BY location, population
+ORDER BY InfectionRatePercentage desc
+
+
+--Showing countries with highest death count per population
+SELECT
+  location,
+  SUM(new_deaths) AS TotalDeathCount
+FROM `sunny-lightning-427102-p2.PortfolioProject.CovidDeaths`
+WHERE continent is not null
+GROUP BY location
+ORDER BY TotalDeathCount desc
+
+
+-- Breaking things down by continent
+
+--Showing continents with highest death count per population
+SELECT
+  continent,
+  SUM(new_deaths) AS TotalDeathCount
+FROM `sunny-lightning-427102-p2.PortfolioProject.CovidDeaths`
+WHERE continent is not null
+GROUP BY continent
+ORDER BY TotalDeathCount desc
+
+
+--GLOBAL NUMBERS
+SELECT
+  date,
+  SUM(new_cases) AS total_cases,
+  SUM(cast(new_deaths as int)) AS total_deaths,
+  SUM(cast(new_deaths as int))/SUM(new_cases)*100 AS DeathPercentage
+FROM `sunny-lightning-427102-p2.PortfolioProject.CovidDeaths`
+WHERE continent is not null
+GROUP BY date
+ORDER BY 1, 2
+
+
+--Looking at total population vs vaccinations
+SELECT
+  dea.continent,
+  dea.location,
+  dea.date,
+  dea.population,
+  vac.new_vaccinations,
+  SUM(cast(vac.new_vaccinations as int)) OVER (partition by dea.location order by dea.location, dea.date) as rolling_vaccinated,
+ -- (rolling_vaccinated/population)*100
+FROM `sunny-lightning-427102-p2.PortfolioProject.CovidDeaths` dea
+JOIN `sunny-lightning-427102-p2.PortfolioProject.CovidVaccinations` vac
+  ON dea.location = vac.location
+  and dea.date = vac.date
+WHERE dea.continent is not null
+ORDER BY 2, 3
+
+
+--USE CTE
+WITH PopvsVac as(
+SELECT
+  dea.continent,
+  dea.location,
+  dea.date,
+  dea.population,
+  vac.new_vaccinations,
+  SUM(cast(vac.new_vaccinations as int)) OVER (partition by dea.location order by dea.location, dea.date) as rolling_vaccinated,
+ -- (rolling_vaccinated/population)*100
+FROM `sunny-lightning-427102-p2.PortfolioProject.CovidDeaths` dea
+JOIN `sunny-lightning-427102-p2.PortfolioProject.CovidVaccinations` vac
+  ON dea.location = vac.location
+  and dea.date = vac.date
+WHERE dea.continent is not null
+--ORDER BY 2, 3
+)
+SELECT *, (rolling_vaccinated/population)*100 AS populationVaccinated
+FROM PopvsVac
+
+
+--TEMP TABLE
+CREATE TEMP TABLE CovidPercentPeopleVaccinated (continent STRING, location STRING, date DATETIME, population INT64, new_vaccinations INT64, rolling_vaccinated INT64);
+INSERT INTO CovidPercentPeopleVaccinated
+SELECT
+  dea.continent,
+  dea.location,
+  dea.date,
+  dea.population,
+  vac.new_vaccinations,
+  SUM(cast(vac.new_vaccinations as int)) OVER (partition by dea.location order by dea.location, dea.date) as rolling_vaccinated,
+ -- (rolling_vaccinated/population)*100
+FROM `sunny-lightning-427102-p2.PortfolioProject.CovidDeaths` dea
+JOIN `sunny-lightning-427102-p2.PortfolioProject.CovidVaccinations` vac
+  ON dea.location = vac.location
+  and dea.date = vac.date
+WHERE dea.continent is not null
+--ORDER BY 2, 3
